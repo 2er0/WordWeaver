@@ -1,3 +1,15 @@
+# Start DB
+
+```bash
+surreal start --user root --pass root memory
+```
+
+# Start server
+
+```bash
+run --package WordWeaverBackend --bin WordWeaverBackend
+```
+
 # Useful resources
 
 - https://github.com/scotow/cobrust/blob/master/src/lobby/mod.rs#L16

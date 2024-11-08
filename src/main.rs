@@ -73,7 +73,7 @@ async fn main() {
     // let (tx, _rx) = broadcast::channel(100);
 
     // Create a shared state for the application that can hold multiple GamesStates.
-    let app_state: SharedAppState = Arc::new(HashMap::new());
+    let app_state: SharedAppState = Arc::new(RwLock::new(HashMap::new()));
 
     // TODO add auth guard
     let admin_routes = Router::new()

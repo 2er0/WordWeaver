@@ -167,8 +167,9 @@ pub async fn fill_gap_handler(State(state): State<SharedAppState>,
                     message: Some("Game not found".to_string()),
                 }).into_response());
     }
-    let write_gap = read_lobby.unwrap().read()
-        .unwrap().game.gaps.get(payload.gap_id as usize).unwrap().write();
+    let lobby = read_lobby.unwrap().read()
+        .unwrap();
+    let write_gap = lobby.game.gaps.get(payload.gap_id as usize).unwrap().write();
     if write_gap.is_err() {
         return (StatusCode::INTERNAL_SERVER_ERROR,
                 Json(BaseResponse {
