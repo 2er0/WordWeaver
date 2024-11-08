@@ -1,0 +1,48 @@
+### GET check if up
+GET 127.0.0.1:3000
+
+### POST create new game
+POST http://127.0.0.1:3000/api/admin/new
+Content-Type: application/json
+
+{
+  "name": "Game 1",
+  "text_section": [
+    "The quick brown fox jumps over the lazy dog.",
+    "The quick brown fox jumps over the lazy dog."
+  ]
+}
+
+### POST create new game forced
+POST http://127.0.0.1:3000/api/admin/new?force=true
+Content-Type: application/json
+
+{
+  "name": "Game 1",
+  "text_section": [
+    "The quick brown fox jumps.",
+    "The quick brown fox jumps over the lazy dog."
+  ]
+}
+
+### GET get available games
+GET http://127.0.0.1:3000/api/admin/available
+
+### POST start new game
+POST http://127.0.0.1:3000/api/admin/start
+Content-Type: application/json
+
+{
+  "name": "Game 1"
+}
+
+### GET get active games
+GET http://127.0.0.1:3000/api/admin/active
+
+### POST close game
+POST http://127.0.0.1:3000/api/admin/close
+Content-Type: application/json
+
+{
+  "name": "YZ7GJU"
+}
