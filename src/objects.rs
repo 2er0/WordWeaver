@@ -3,7 +3,7 @@ use std::sync::RwLock;
 use tokio::sync::broadcast;
 
 pub struct User {
-    pub username: String,
+    pub name: String,
     pub token: String,
     pub correct_guesses: u32,
 }
@@ -29,6 +29,7 @@ pub struct GameState {
     pub tx: broadcast::Sender<String>,
     pub gaps: Vec<RwLock<Gap>>,
     pub guesses: RwLock<Vec<Vec<Guess>>>,
+    pub view: String,
 }
 
 pub struct Lobby {
@@ -54,9 +55,10 @@ impl Lobby {
             .collect();
         gaps.last().unwrap().write().unwrap().gap_after = false;
         let game_state = GameState {
-            tx: broadcast::channel(10).0,
+            tx: broadcast::channel(100).0,
             gaps,
             guesses: RwLock::new(vec![]),
+            view: "waiting".to_string(),
         };
         // Create a new lobby with the specified id and game state
         Lobby {

@@ -8,8 +8,10 @@ use axum::response::IntoResponse;
 use axum::Json;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+use serde_json::to_string;
 use surrealdb::engine::remote::ws::Client;
 use surrealdb::Surreal;
+use crate::ws_dto::WSMessage;
 
 type SharedAppState = Arc<RwLock<HashMap<String, RwLock<Lobby>>>>;
 
@@ -211,3 +213,37 @@ pub async fn close_game_handler(state: State<SharedAppState>,
     (StatusCode::OK, Json(BaseResponse { success: true, message: None }).into_response())
 }
 
+// Url /api/admin/startfill
+// Starts the filling process for the specified gap
+// Method: POST
+// Request: BaseStringDTO{id: String}
+// Response: BaseResponse
+#[utoipa::path(
+    post,
+    path = "/api/admin/startfill",
+    request_body = BaseStringDTO,
+    responses(
+        (status = 200, description = "Filling started", body = BaseResponse),
+        (status = 404, description = "Game not found", body = BaseResponse)
+    )
+)]
+pub async fn start_fill_handler(state: State<SharedAppState>,
+                                payload: Json<BaseStringDTO>)
+                                -> impl IntoResponse {
+    // Start the filling process for the specified gap here
+    let exclusive_state = state.read().unwrap();
+    let lobby = exclusive_state.get(&payload.name);
+    if lobby.is_none() {
+        return (StatusCode::NOT_FOUND,
+                Json(BaseResponse {
+                    success: false,
+                    message: Some("Game not found".to_string()),
+                }).into_response());
+    }
+    let mut lobby = lobby.unwrap().write().unwrap();
+    lobby.game.view = "filling".to_string();
+    // notify all users that the filling process has started
+    let _ = lobby.game.tx.send(
+        to_string(&WSMessage::change_view("filling".to_string())).unwrap());
+    (StatusCode::OK, Json(BaseResponse { success: true, message: None }).into_response())
+}

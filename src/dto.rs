@@ -34,7 +34,7 @@ pub struct BaseStringDTO {
 
 #[derive(Serialize, Deserialize, Debug, ToSchema)]
 pub struct UserDTO {
-    pub username: String,
+    pub name: String,
     pub token: String,
 }
 
@@ -49,6 +49,25 @@ pub struct PreGapTextDTO {
 pub struct JoinResponse {
     pub success: bool,
     pub pre_gaps_text: Vec<PreGapTextDTO>,
+    pub current_users: Vec<UserDTO>,
+}
+
+#[derive(Serialize, Deserialize, Debug, ToSchema)]
+pub struct CurrentGapTextDTO {
+    pub id: u32,
+    pub text: String,
+    pub gap_after: bool,
+    pub claimed: bool,
+    pub gap_value: Option<String>,
+    pub filled_by_current_user: bool
+}
+
+#[derive(Serialize, Deserialize, Debug, ToSchema)]
+pub struct RejoinResponseDTO {
+    pub success: bool,
+    pub current_gap_text: Vec<CurrentGapTextDTO>,
+    pub view: String,
+    pub users: Vec<UserDTO>,
 }
 
 #[derive(Serialize, Deserialize, Debug, ToSchema)]

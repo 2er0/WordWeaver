@@ -7,15 +7,10 @@ mod utils;
 mod ws_dto;
 
 use axum::routing::post;
-use axum::{
-    extract::{
-        ws::{Message, WebSocket, WebSocketUpgrade},
-        State,
-    },
-    response::{Html, IntoResponse},
-    routing::get,
-    Router,
-};
+use axum::{extract::{
+    ws::{Message, WebSocket, WebSocketUpgrade},
+    State,
+}, response::{Html, IntoResponse}, routing::get, Json, Router};
 use futures::{sink::SinkExt, stream::StreamExt};
 // Our shared state
 use objects::{GameState, Lobby};
@@ -25,13 +20,19 @@ use std::{
     collections::HashSet,
     sync::{Arc, Mutex},
 };
+use axum::extract::Path;
+use axum::http::Method;
 use tokio::sync::broadcast;
+use tokio_tungstenite::tungstenite::http::header;
+use tower_http::cors::{CorsLayer, Any};
 use tower_http::trace;
 use tower_http::trace::TraceLayer;
-use tracing::Level;
+use tracing::{event, Level};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
+use serde_json::{json, from_str};
+use crate::ws_dto::WSAuthMessage;
 
 type SharedAppState = Arc<RwLock<HashMap<String, RwLock<Lobby>>>>;
 
@@ -43,6 +44,8 @@ type SharedAppState = Arc<RwLock<HashMap<String, RwLock<Lobby>>>>;
     crate::admin_api::start_game_handler,
     crate::admin_api::active_games_handler,
     crate::admin_api::close_game_handler,
+    crate::admin_api::start_fill_handler,
+    crate::game_api::hello_handler,
     crate::game_api::join_game_handler,
     crate::game_api::claim_gap_handler,
     crate::game_api::fill_gap_handler,
@@ -82,11 +85,14 @@ async fn main() {
         .route("/start", post(admin_api::start_game_handler))
         .route("/active", get(admin_api::active_games_handler))
         .route("/close", post(admin_api::close_game_handler))
+        .route("/startfill", post(admin_api::start_fill_handler))
         .with_state(app_state.clone());
 
     // game routes
     let game_routes = Router::new()
+        .route("/hello", get(game_api::hello_handler))
         .route("/join", post(game_api::join_game_handler))
+        .route("/rejoin", post(game_api::rejoin_game_handler))
         .route("/claim", post(game_api::claim_gap_handler))
         .route("/fill", post(game_api::fill_gap_handler))
         .route("/guess", post(game_api::guess_gap_handler))
@@ -98,12 +104,18 @@ async fn main() {
 
     let swagger_ui = SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi());
 
+    let cors_layer = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers([header::CONTENT_TYPE, header::ACCEPT]);
+
     let app = Router::new()
         .route("/", get(index))
         .nest("/api/admin", admin_routes)
-        .nest("/api/{game_id}", game_routes)
-        .nest("/websocket/{game_id}", websocket_routes)
+        .nest("/api/:game_id", game_routes)
+        .nest("/websocket/:game_id", websocket_routes)
         .merge(swagger_ui)
+        .layer(cors_layer)
         .layer(TraceLayer::new_for_http()
                    .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
                    .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
@@ -118,96 +130,82 @@ async fn main() {
 
 async fn websocket_handler(
     ws: WebSocketUpgrade,
-    State(state): State<SharedAppState>,
+    game_id: Path<String>,
+    state: State<SharedAppState>,
 ) -> impl IntoResponse {
-    ws.on_upgrade(|socket| websocket(socket, state))
+    ws.on_upgrade(|socket| websocket(socket, game_id, state))
 }
 
 // This function deals with a single websocket connection, i.e., a single
 // connected client / user, for which we will spawn two independent tasks (for
 // receiving / sending chat messages).
-async fn websocket(stream: WebSocket, state: SharedAppState) {
+async fn websocket(stream: WebSocket,
+                   Path(game_id): Path<String>,
+                   State(state): State<SharedAppState>) {
+    // check if the game exists
+    if !state.read().unwrap().contains_key(&game_id) {
+        return;
+    }
     // By splitting, we can send and receive at the same time.
-    // let (mut sender, mut receiver) = stream.split();
-    //
-    // // Username gets set in the receive loop, if it's valid.
-    // let mut username = String::new();
-    // // Loop until a text message is found.
-    // while let Some(Ok(message)) = receiver.next().await {
-    //     if let Message::Text(name) = message {
-    //         // If username that is sent by client is not taken, fill username string.
-    //         check_username(&state, &mut username, &name);
-    //
-    //         // If not empty we want to quit the loop else we want to quit function.
-    //         if !username.is_empty() {
-    //             break;
-    //         } else {
-    //             // Only send our client that username is taken.
-    //             let _ = sender
-    //                 .send(Message::Text(String::from("Username already taken.")))
-    //                 .await;
-    //
-    //             return;
-    //         }
-    //     }
-    // }
-    //
-    // // We subscribe *before* sending the "joined" message, so that we will also
-    // // display it to our client.
-    // let mut rx = state.tx.subscribe();
-    //
-    // // Now send the "joined" message to all subscribers.
-    // let msg = format!("{username} joined.");
-    // tracing::debug!("{msg}");
-    // let _ = state.tx.send(msg);
-    //
-    // // Spawn the first task that will receive broadcast messages and send text
-    // // messages over the websocket to our client.
-    // let mut send_task = tokio::spawn(async move {
-    //     while let Ok(msg) = rx.recv().await {
-    //         // In any websocket error, break loop.
-    //         if sender.send(Message::Text(msg)).await.is_err() {
-    //             break;
-    //         }
-    //     }
-    // });
-    //
-    // // Clone things we want to pass (move) to the receiving task.
-    // let tx = state.tx.clone();
-    // let name = username.clone();
-    //
-    // // Spawn a task that takes messages from the websocket, prepends the user
-    // // name, and sends them to all broadcast subscribers.
-    // let mut recv_task = tokio::spawn(async move {
-    //     while let Some(Ok(Message::Text(text))) = receiver.next().await {
-    //         // Add username before message.
-    //         let _ = tx.send(format!("{name}: {text}"));
-    //     }
-    // });
-    //
-    // // If any one of the tasks run to completion, we abort the other.
-    // tokio::select! {
-    //     _ = &mut send_task => recv_task.abort(),
-    //     _ = &mut recv_task => send_task.abort(),
-    // };
-    //
-    // // Send "user left" message (similar to "joined" above).
-    // let msg = format!("{username} left.");
-    // tracing::debug!("{msg}");
-    // let _ = state.tx.send(msg);
-    //
-    // // Remove username from map so new clients can take it again.
-    // state.user_set.lock().unwrap().remove(&username);
-}
+    let (mut sender, mut receiver) = stream.split();
 
-fn check_username(state: &Lobby, string: &mut String, name: &str) {
-    // let mut user_set = state.user_set.lock().unwrap();
-    //
-    // if !user_set.contains(name) {
-    //     user_set.insert(name.to_owned());
-    //
-    //     string.push_str(name);
-    // }
+    // Subscribe to the broadcast channel for the game
+    let mut rx = {
+        let state = state.read().unwrap();
+        let lobby = state.get(&game_id).unwrap();
+        let read_lobby = lobby.read().unwrap();
+        read_lobby.game.tx.subscribe()
+    };
+
+    // Spawn a task to send messages to the client
+    let mut send_task = tokio::spawn(async move {
+        while let Ok(msg) = rx.recv().await {
+            if sender.send(Message::Text(msg)).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    // Spawn a task to receive messages from the client
+    let mut recv_task = tokio::spawn(async move {
+        while let Some(msg) = receiver.next().await {
+            let msg = match msg {
+                Ok(msg) => msg,
+                Err(_) => break,
+            };
+            let msg = match msg {
+                Message::Text(msg) => msg,
+                _ => continue,
+            };
+
+            let auth_msg = from_str::<WSAuthMessage>(&msg);
+            if auth_msg.is_err() {
+                event!(Level::ERROR, "{}", auth_msg.unwrap_err());
+                break;
+            }
+            let auth_msg = auth_msg.unwrap();
+            if auth_msg.obj != "auth" {
+                event!(Level::ERROR, "Expected auth message, got {}", auth_msg.obj);
+                break;
+            }
+            // check if the user is in the game
+            if state.read().unwrap()
+                .get(&game_id).unwrap().read().unwrap()
+                .users.read().unwrap()
+                .iter().filter(|u| u.token == auth_msg.token).count() == 1 {
+                event!(Level::INFO, "User {} joined WScom", auth_msg.token);
+            } else {
+                event!(Level::ERROR, "User not in game");
+                break;
+            }
+        }
+    });
+
+    // If any one of the tasks run to completion, we abort the other.
+    tokio::select! {
+        _ = &mut send_task => recv_task.abort(),
+        _ = &mut recv_task => send_task.abort(),
+    }
 }
 
 // Include utf-8 file at **compile** time.
