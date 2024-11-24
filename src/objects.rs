@@ -43,11 +43,11 @@ impl Lobby {
     pub fn new(id: String, gaps: Vec<String>) -> Self {
         // Create a new game state with the specified gaps
         // The last gap should not have a gap after it
-        let gaps: Vec<RwLock<Gap>> = gaps.iter()
-            .map(|g|
+        let gaps: Vec<RwLock<Gap>> = gaps.iter().enumerate()
+            .map(| g|
                 RwLock::new(Gap {
-                    id: 0,
-                    text_section: g.clone(),
+                    id: g.0 as u32,
+                    text_section: g.1.clone(),
                     gap_after: true,
                     value: "".to_string(),
                     filled_by: None,

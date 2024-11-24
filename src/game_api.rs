@@ -254,7 +254,7 @@ pub async fn fill_gap_handler(State(state): State<SharedAppState>,
     gap_to_fill.value = payload.content.clone();
     // notify all users about the filled gap
     let send_status = read_lobby.unwrap().read().unwrap()
-        .game.tx.send(to_string(&WSMessage::gap_filled(payload.gap_id, payload.content.clone())).unwrap());
+        .game.tx.send(to_string(&WSMessage::gap_filled(payload.gap_id)).unwrap());
     (StatusCode::OK, Json(BaseResponse { success: true, message: None }).into_response())
 }
 
@@ -353,17 +353,25 @@ pub async fn rejoin_game_handler(State(state): State<SharedAppState>,
                 }).into_response());
     }
 
+    let share_fillings = lobby.game.view != "fill";
     let pre_gap_text = lobby.game.gaps.iter()
         .map(|g| {
             let g_read = g.read().unwrap();
+            let filled_by_current_user = g_read.filled_by.as_ref()
+                .is_some_and(|u| u == &payload.token);
+            let gap_value = if share_fillings {
+                Some(g_read.value.clone())
+            } else {
+                None
+            };
             CurrentGapTextDTO {
                 id: g_read.id,
                 text: g_read.text_section.clone(),
                 gap_after: g_read.gap_after,
                 claimed: g_read.filled_by.is_some(),
-                gap_value: Some(g_read.value.clone()),
-                filled_by_current_user: g_read.filled_by
-                    .as_ref().is_some_and(|u| u == &payload.token),
+                filled: !g_read.value.is_empty(),
+                gap_value,
+                filled_by_current_user,
             }
         }).collect();
 

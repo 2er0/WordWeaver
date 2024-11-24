@@ -241,9 +241,9 @@ pub async fn start_fill_handler(state: State<SharedAppState>,
                 }).into_response());
     }
     let mut lobby = lobby.unwrap().write().unwrap();
-    lobby.game.view = "filling".to_string();
+    lobby.game.view = "fill".to_string();
     // notify all users that the filling process has started
     let _ = lobby.game.tx.send(
-        to_string(&WSMessage::change_view("filling".to_string())).unwrap());
+        to_string(&WSMessage::change_view("fill".to_string())).unwrap());
     (StatusCode::OK, Json(BaseResponse { success: true, message: None }).into_response())
 }

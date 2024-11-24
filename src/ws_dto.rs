@@ -12,13 +12,6 @@ pub struct TempUser {
     pub token: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GabFilled {
-    pub gap_id: u32,
-    pub value: String,
-}
-
-
 #[derive(Deserialize, Debug)]
 pub struct WSAuthMessage {
     pub obj: String,
@@ -56,12 +49,11 @@ impl<U32> WSMessage<U32> {
             value: gap_id,
         }
     }
-}
-impl WSMessage<GabFilled> {
-    pub fn gap_filled(gap_id: u32, value: String) -> Self {
+
+    pub fn gap_filled(gap_id: U32) -> Self {
         WSMessage {
             obj: "gap_filled".to_string(),
-            value: GabFilled { gap_id, value },
+            value: gap_id,
         }
     }
 }

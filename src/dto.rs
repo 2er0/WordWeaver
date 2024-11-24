@@ -58,6 +58,7 @@ pub struct CurrentGapTextDTO {
     pub text: String,
     pub gap_after: bool,
     pub claimed: bool,
+    pub filled: bool,
     pub gap_value: Option<String>,
     pub filled_by_current_user: bool
 }
