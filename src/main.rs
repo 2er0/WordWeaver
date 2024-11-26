@@ -49,6 +49,7 @@ type SharedAppState = Arc<RwLock<HashMap<String, RwLock<Lobby>>>>;
     crate::game_api::join_game_handler,
     crate::game_api::claim_gap_handler,
     crate::game_api::fill_gap_handler,
+    crate::game_api::filled_gaps_handler,
     crate::game_api::guess_gap_handler,
 ))]
 pub struct ApiDoc;
@@ -95,6 +96,7 @@ async fn main() {
         .route("/rejoin", post(game_api::rejoin_game_handler))
         .route("/claim", post(game_api::claim_gap_handler))
         .route("/fill", post(game_api::fill_gap_handler))
+        .route("/filled", get(game_api::filled_gaps_handler))
         .route("/guess", post(game_api::guess_gap_handler))
         .with_state(app_state.clone());
 

@@ -56,4 +56,11 @@ impl<U32> WSMessage<U32> {
             value: gap_id,
         }
     }
+
+    pub fn start_guessing(delay: U32) -> Self {
+        WSMessage {
+            obj: "start_guessing".to_string(),
+            value: delay,
+        }
+    }
 }

@@ -85,6 +85,24 @@ pub struct GapFillDTO {
 }
 
 #[derive(Serialize, Deserialize, Debug, ToSchema)]
+pub struct TokenQuery {
+    pub token: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, ToSchema)]
+pub struct GapFilledDTO {
+    pub gap_id: u32,
+    pub value: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, ToSchema)]
+pub struct PreGuessingDTO {
+    pub success: bool,
+    pub gaps: Vec<GapFilledDTO>,
+    pub users: Vec<UserDTO>,
+}
+
+#[derive(Serialize, Deserialize, Debug, ToSchema)]
 pub struct GuessDTO {
     pub gap_id: u32,
     pub token: String, // user token
