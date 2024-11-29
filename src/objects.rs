@@ -6,6 +6,7 @@ pub struct User {
     pub name: String,
     pub token: String,
     pub correct_guesses: u32,
+    pub guessed: bool,
 }
 
 pub struct Gap {
@@ -17,18 +18,10 @@ pub struct Gap {
 }
 
 
-#[derive(Serialize, Deserialize)]
-pub struct Guess {
-    pub gap_id: u32,
-    pub guess: String,  // user token
-    pub guesser: String,  // user token
-}
-
 pub struct GameState {
     // Channel used to send messages to all connected clients.
     pub tx: broadcast::Sender<String>,
     pub gaps: Vec<RwLock<Gap>>,
-    pub guesses: RwLock<Vec<Vec<Guess>>>,
     pub view: String,
 }
 
@@ -57,7 +50,6 @@ impl Lobby {
         let game_state = GameState {
             tx: broadcast::channel(100).0,
             gaps,
-            guesses: RwLock::new(vec![]),
             view: "waiting".to_string(),
         };
         // Create a new lobby with the specified id and game state

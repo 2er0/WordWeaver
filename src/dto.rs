@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use surrealdb::RecordId;
 use utoipa::ToSchema;
+use crate::ws_dto::GuessScore;
 
 #[derive(Deserialize, Serialize, Clone, Debug, ToSchema)]
 pub struct GameDTO {
@@ -25,6 +26,13 @@ pub struct GameDBDTO {
 pub struct BaseResponse {
     pub success: bool,
     pub message: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, ToSchema)]
+pub struct EndGameResponse {
+    pub success: bool,
+    pub view: String,
+    pub value: Vec<GuessScore>,
 }
 
 #[derive(Deserialize, Serialize, Debug, ToSchema)]
@@ -105,12 +113,11 @@ pub struct PreGuessingDTO {
 #[derive(Serialize, Deserialize, Debug, ToSchema)]
 pub struct GuessDTO {
     pub gap_id: u32,
-    pub token: String, // user token
+    pub token: String, // guessed user token
 }
 
 #[derive(Serialize, Deserialize, Debug, ToSchema)]
 pub struct GuessesDTO {
-    pub gap_id: u32,
-    pub token: String, // user token
+    pub token: String, // guesser user token
     pub guesses: Vec<GuessDTO>,
 }

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct WSMessage<T> {
@@ -10,6 +11,13 @@ pub struct WSMessage<T> {
 pub struct TempUser {
     pub name: String,
     pub token: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, ToSchema)]
+pub struct GuessScore {
+    pub name: String,
+    pub token: String,
+    pub score: u32,
 }
 
 #[derive(Deserialize, Debug)]
@@ -26,14 +34,17 @@ impl WSMessage<TempUser> {
         }
     }
 }
-impl<String> WSMessage<String> {
-    pub fn guessed(token: String) -> Self {
+
+impl WSMessage<Vec<GuessScore>> {
+    pub fn guess_scores(guesses: Vec<GuessScore>) -> Self {
         WSMessage {
-            obj: "guessed".to_string(),
-            value: token,
+            obj: "guess_scores".to_string(),
+            value: guesses,
         }
     }
+}
 
+impl<String> WSMessage<String> {
     pub fn change_view(view: String) -> Self {
         WSMessage {
             obj: "change_view".to_string(),

@@ -1,11 +1,15 @@
-use crate::dto::{BaseResponse, CurrentGapTextDTO, GapClaimDTO, GapFillDTO, GapFilledDTO, GuessesDTO, JoinResponse, PreGapTextDTO, PreGuessingDTO, RejoinResponseDTO, TokenQuery, UserDTO};
-use crate::objects::{Guess, Lobby, User};
-use crate::ws_dto::WSMessage;
+use crate::dto::{
+    BaseResponse, CurrentGapTextDTO, EndGameResponse, GapClaimDTO, GapFillDTO, GapFilledDTO,
+    GuessesDTO, JoinResponse, PreGapTextDTO, PreGuessingDTO, RejoinResponseDTO, TokenQuery,
+    UserDTO,
+};
+use crate::objects::{Lobby, User};
+use crate::ws_dto::{GuessScore, TempUser, WSMessage};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
-use serde_json::{to_string};
+use serde_json::to_string;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use tracing::{event, Level};
@@ -97,6 +101,7 @@ pub async fn join_game_handler(
         name: payload.name.clone(),
         token: payload.token.clone(),
         correct_guesses: 0,
+        guessed: false,
     };
     let lobby = opt_lobby.unwrap().read().unwrap();
     lobby.users.write().unwrap().push(user);
@@ -508,24 +513,65 @@ pub async fn guess_gap_handler(
             .into_response(),
         );
     }
+    {
+        read_lobby.unwrap().write().unwrap().game.view = "ranking".to_string();
+    }
     let read_lobby = read_lobby.unwrap().read().unwrap();
-    read_lobby.game.guesses.write().unwrap().push(
-        payload
-            .guesses
+    // store number of correct guesses
+    let mut correct_guesses = 0;
+    // process the guesses
+    for guess in &payload.guesses {
+        let g = read_lobby
+            .game
+            .gaps
             .iter()
-            .map(|g| Guess {
-                gap_id: g.gap_id,
-                guess: g.token.clone(),
-                guesser: payload.token.clone(),
-            })
-            .collect(),
-    );
+            .find(|g| g.read().unwrap().id == guess.gap_id);
+        if g.is_some() {
+            let gap = g.unwrap().read().unwrap();
+            if gap.gap_after
+                && gap.filled_by.is_some()
+                && gap.filled_by.as_ref().unwrap() == &guess.token
+            {
+                correct_guesses += 1;
+            }
+        };
+    }
+    // update the user's correct guesses
+    {
+        let mut users = read_lobby.users.write().unwrap();
+        let user_index = users.iter().position(|u| u.token == payload.token);
+        if user_index.is_none() {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(BaseResponse {
+                    success: false,
+                    message: Some("User not found".to_string()),
+                })
+                .into_response(),
+            );
+        }
+        users[user_index.unwrap()].correct_guesses = correct_guesses;
+        users[user_index.unwrap()].guessed = true;
+    }
+
     // notify all users about the guesses
-    // todo define the message object
-    let send_status = read_lobby
-        .game
-        .tx
-        .send(to_string(&WSMessage::guessed(payload.token.clone())).unwrap());
+    if read_lobby.users.read().unwrap().iter().all(|u| u.guessed) {
+        let guesses = read_lobby
+            .users
+            .read()
+            .unwrap()
+            .iter()
+            .map(|u| GuessScore {
+                name: u.name.clone(),
+                token: u.token.clone(),
+                score: u.correct_guesses,
+            })
+            .collect();
+        let send_status = read_lobby
+            .game
+            .tx
+            .send(to_string(&WSMessage::guess_scores(guesses)).unwrap());
+    }
     (
         StatusCode::OK,
         Json(BaseResponse {
@@ -574,6 +620,29 @@ pub async fn rejoin_game_handler(
         );
     }
     let lobby = opt_lobby.unwrap().read().unwrap();
+    if lobby.game.view == "ranking" {
+        // game has ended
+        return (
+            StatusCode::OK,
+            Json(EndGameResponse {
+                success: true,
+                view: "ranking".to_string(),
+                value: lobby
+                    .users
+                    .read()
+                    .unwrap()
+                    .iter()
+                    .map(|u| GuessScore {
+                        name: u.name.clone(),
+                        token: u.token.clone(),
+                        score: u.correct_guesses,
+                    })
+                    .collect(),
+            })
+            .into_response(),
+        );
+    }
+
     let users = &lobby.users.read().unwrap();
     let user_index = users
         .iter()
