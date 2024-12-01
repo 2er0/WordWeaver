@@ -1,41 +1,48 @@
-mod objects;
-mod dto;
 mod admin_api;
-mod game_api;
 mod db;
+mod dto;
+mod game_api;
+mod objects;
 mod utils;
 mod ws_dto;
 
 use axum::routing::post;
-use axum::{extract::{
-    ws::{Message, WebSocket, WebSocketUpgrade},
-    State,
-}, response::{Html, IntoResponse}, routing::get, Json, Router};
+use axum::{
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        State,
+    },
+    response::{Html, IntoResponse},
+    routing::get,
+    Json, Router,
+};
 use futures::{sink::SinkExt, stream::StreamExt};
 // Our shared state
+use crate::ws_dto::WSAuthMessage;
+use axum::extract::Path;
+use axum::http::{Method, StatusCode};
+use axum::serve::Serve;
+use axum_extra::routing;
 use objects::{GameState, Lobby};
+use serde_json::{from_str, json};
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::{
     collections::HashSet,
     sync::{Arc, Mutex},
 };
-use axum::extract::Path;
-use axum::http::Method;
 use tokio::sync::broadcast;
 use tokio_tungstenite::tungstenite::http::header;
-use tower_http::cors::{CorsLayer, Any};
+use tower_http::cors::{Any, CorsLayer};
+use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace;
 use tower_http::trace::TraceLayer;
 use tracing::{event, Level};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
-use serde_json::{json, from_str};
-use crate::ws_dto::WSAuthMessage;
 
 type SharedAppState = Arc<RwLock<HashMap<String, RwLock<Lobby>>>>;
-
 
 #[derive(OpenApi)]
 #[openapi(paths(
@@ -53,7 +60,6 @@ type SharedAppState = Arc<RwLock<HashMap<String, RwLock<Lobby>>>>;
     crate::game_api::guess_gap_handler,
 ))]
 pub struct ApiDoc;
-
 
 #[tokio::main]
 async fn main() {
@@ -111,16 +117,34 @@ async fn main() {
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers([header::CONTENT_TYPE, header::ACCEPT]);
 
+    let serve_dir = ServeDir::new("assets").not_found_service(ServeFile::new("assets/index.html"));
     let app = Router::new()
-        .route("/", get(index))
+        //.route("/", Serve(dir!("assets/index.html")))
+        .route(
+            "/",
+            axum::routing::get_service(ServeDir::new("assets")).handle_error(|_| async {
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            }),
+        )
         .nest("/api/admin", admin_routes)
         .nest("/api/:game_id", game_routes)
         .nest("/websocket/:game_id", websocket_routes)
         .merge(swagger_ui)
+        .nest_service(
+            "/assets",
+            axum::routing::get_service(ServeDir::new("assets/assets")),
+        )
+        .fallback_service(serve_dir)
+        // .fallback_service(
+        //     axum::routing::get_service(ServeDir::new("assets")).handle_error(|_| async {
+        //         (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+        //     }),
+        // )
         .layer(cors_layer)
-        .layer(TraceLayer::new_for_http()
-                   .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
-                   .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
+                .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
         );
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
@@ -141,9 +165,11 @@ async fn websocket_handler(
 // This function deals with a single websocket connection, i.e., a single
 // connected client / user, for which we will spawn two independent tasks (for
 // receiving / sending chat messages).
-async fn websocket(stream: WebSocket,
-                   Path(game_id): Path<String>,
-                   State(state): State<SharedAppState>) {
+async fn websocket(
+    stream: WebSocket,
+    Path(game_id): Path<String>,
+    State(state): State<SharedAppState>,
+) {
     // check if the game exists
     if !state.read().unwrap().contains_key(&game_id) {
         return;
@@ -191,10 +217,21 @@ async fn websocket(stream: WebSocket,
                 break;
             }
             // check if the user is in the game
-            if state.read().unwrap()
-                .get(&game_id).unwrap().read().unwrap()
-                .users.read().unwrap()
-                .iter().filter(|u| u.token == auth_msg.token).count() == 1 {
+            if state
+                .read()
+                .unwrap()
+                .get(&game_id)
+                .unwrap()
+                .read()
+                .unwrap()
+                .users
+                .read()
+                .unwrap()
+                .iter()
+                .filter(|u| u.token == auth_msg.token)
+                .count()
+                == 1
+            {
                 event!(Level::INFO, "User {} joined WScom", auth_msg.token);
             } else {
                 event!(Level::ERROR, "User not in game");
