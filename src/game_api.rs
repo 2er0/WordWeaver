@@ -97,6 +97,16 @@ pub async fn join_game_handler(
             .into_response(),
         );
     }
+    if opt_lobby.unwrap().read().unwrap().game.view != "waiting" {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(BaseResponse {
+                success: false,
+                message: Some("Game can't be joined anymore.".to_string()),
+            })
+            .into_response(),
+        );
+    }
     let user = User {
         name: payload.name.clone(),
         token: payload.token.clone(),
