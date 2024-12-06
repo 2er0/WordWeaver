@@ -335,7 +335,9 @@ pub async fn fill_gap_handler(
                 .into_response(),
             );
         }
-        gap_to_fill.value = payload.content.clone();
+        let mut content = payload.content.clone();
+        content.truncate(140);
+        gap_to_fill.value = content;
     }
     let mut all_filled = false;
     {

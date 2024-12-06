@@ -20,8 +20,6 @@ dependencies = [
  "axum",
  "axum-extra",
  "futures",
- "futures-util",
- "headers",
  "lazy_static",
  "rand",
  "serde",

@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    depends_on:
+      - surrealdb
+    environment:
+      - DATABASE_URL=surrealdb:8000
+      - PRODUCTION=true
+      - AUTH_KEY=Blank69
+
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    ports:
+      - "8000:8000"
+    command: start --log debug --user root --pass root --bind 0.0.0.0:8000
+    environment:
+      SURREALDB_USER: root
+      SURREALDB_PASS: root

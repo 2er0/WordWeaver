@@ -12,12 +12,15 @@ use axum::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         State,
     },
+    middleware,
     response::{Html, IntoResponse},
     routing::get,
     Json, Router,
 };
 use futures::{sink::SinkExt, stream::StreamExt};
 // Our shared state
+use crate::admin_api::auth_check;
+use crate::objects::SecurityAddon;
 use crate::ws_dto::WSAuthMessage;
 use axum::extract::Path;
 use axum::http::{Method, StatusCode};
@@ -45,20 +48,23 @@ use utoipa_swagger_ui::SwaggerUi;
 type SharedAppState = Arc<RwLock<HashMap<String, RwLock<Lobby>>>>;
 
 #[derive(OpenApi)]
-#[openapi(paths(
-    crate::admin_api::new_game_handler,
-    crate::admin_api::available_games_handler,
-    crate::admin_api::start_game_handler,
-    crate::admin_api::active_games_handler,
-    crate::admin_api::close_game_handler,
-    crate::admin_api::start_fill_handler,
-    crate::game_api::hello_handler,
-    crate::game_api::join_game_handler,
-    crate::game_api::claim_gap_handler,
-    crate::game_api::fill_gap_handler,
-    crate::game_api::filled_gaps_handler,
-    crate::game_api::guess_gap_handler,
-))]
+#[openapi(
+    paths(
+        crate::admin_api::new_game_handler,
+        crate::admin_api::available_games_handler,
+        crate::admin_api::start_game_handler,
+        crate::admin_api::active_games_handler,
+        crate::admin_api::close_game_handler,
+        crate::admin_api::start_fill_handler,
+        crate::game_api::hello_handler,
+        crate::game_api::join_game_handler,
+        crate::game_api::claim_gap_handler,
+        crate::game_api::fill_gap_handler,
+        crate::game_api::filled_gaps_handler,
+        crate::game_api::guess_gap_handler,
+    ),
+    modifiers(&SecurityAddon)
+)]
 pub struct ApiDoc;
 
 #[tokio::main]
@@ -93,6 +99,7 @@ async fn main() {
         .route("/active", get(admin_api::active_games_handler))
         .route("/close", post(admin_api::close_game_handler))
         .route("/startfill", post(admin_api::start_fill_handler))
+        .layer(middleware::from_fn(auth_check))
         .with_state(app_state.clone());
 
     // game routes
@@ -135,11 +142,6 @@ async fn main() {
             axum::routing::get_service(ServeDir::new("assets/assets")),
         )
         .fallback_service(serve_dir)
-        // .fallback_service(
-        //     axum::routing::get_service(ServeDir::new("assets")).handle_error(|_| async {
-        //         (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
-        //     }),
-        // )
         .layer(cors_layer)
         .layer(
             TraceLayer::new_for_http()
@@ -147,9 +149,7 @@ async fn main() {
                 .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
         );
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     tracing::debug!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
 }
@@ -245,9 +245,4 @@ async fn websocket(
         _ = &mut send_task => recv_task.abort(),
         _ = &mut recv_task => send_task.abort(),
     }
-}
-
-// Include utf-8 file at **compile** time.
-async fn index() -> Html<&'static str> {
-    Html("WordWeaver")
 }

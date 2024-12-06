@@ -10,9 +10,7 @@ tokio = { version = "1.41.0", features = ["full"] }
 tokio-tungstenite = "0.24.0"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 futures = "0.3.31"
-futures-util = { version = "0.3.31", default-features = false, features = ["sink", "std"] }
 tracing = "0.1.40"
-headers = "0.4.0"
 axum-extra = { version = "0.9.4", features = ["typed-header"] }
 tower-http = { version = "0.6.1", features = ["fs", "trace", "cors"] }
 serde = { version = "1.0.213", features = ["derive"] }
@@ -26,7 +24,3 @@ serde_json = "1.0.132"
 [[bin]]
 name = "WordWeaverBackend"
 path = "src/main.rs"
-
-#[[bin]]
-#name = "example-client"
-#path = "src/client.rs"
