@@ -1,7 +1,7 @@
 # Blank vs humanity (Word Weaver Backend)
 
 [![Static Badge](https://img.shields.io/badge/Word_Weaver_UI-React-blue)](https://github.com/2er0/WordWeaverUI)
-![Static Badge](https://img.shields.io/badge/Word_Weaver_Backend-Rust-orange)
+[![Static Badge](https://img.shields.io/badge/Word_Weaver_Backend-Rust-orange)](https://github.com/2er0/WordWeaver)
 
 It's a game where you can challenge your friends to see who is the most creative and can you figure out who completed
 the blank spaces of a sentence with the funny and creative answers.
@@ -59,4 +59,27 @@ The UI creates for each new text entry in the list a new blank space except for 
     ". When ever you talk about it, something happens in the office."
   ]
 }
+```
+
+---
+
+## How to develop/contribute
+
+### Prerequisites
+
+- [Git](https://git-scm.com/downloads)
+- [Rust](https://www.rust-lang.org/tools/install)
+- [Docker](https://docs.docker.com/get-docker/)
+- [Docker Compose](https://docs.docker.com/compose/install/)
+
+### Run the database
+
+```bash
+docker compose up -d db
+```
+
+### Run the server
+
+```bash
+cargo run
 ```
