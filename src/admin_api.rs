@@ -8,24 +8,26 @@ use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
+use lazy_static::lazy_static;
 use serde_json::to_string;
 use std::collections::HashMap;
 use std::string::ToString;
 use std::sync::{Arc, RwLock};
-use lazy_static::lazy_static;
 use surrealdb::engine::remote::ws::Client;
 use surrealdb::Surreal;
 
 type SharedAppState = Arc<RwLock<HashMap<String, RwLock<Lobby>>>>;
 
-lazy_static!(
+lazy_static! {
     static ref ENV: bool = std::env::var("PRODUCTION")
         .unwrap_or("false".to_string())
         .parse()
         .unwrap();
-    static ref AUTH_KEY: String = std::env::var("AUTH_KEY").unwrap_or_else(|_| "Blank1".to_string());
-);
+    static ref AUTH_KEY: String =
+        std::env::var("AUTH_KEY").unwrap_or_else(|_| "Blank1".to_string());
+}
 
+// Simple middleware to check if the api key is correct
 pub async fn auth_check(request: Request, next: Next) -> Response {
     if *ENV {
         match request.headers().get("apikey") {
@@ -172,7 +174,7 @@ pub async fn available_games_handler(State(state): State<SharedAppState>) -> imp
                 success: false,
                 message: Some("Failed to get games".to_string()),
             })
-                .into_response(),
+            .into_response(),
         );
     }
     (
@@ -187,7 +189,7 @@ pub async fn available_games_handler(State(state): State<SharedAppState>) -> imp
                 })
                 .collect::<Vec<GameDTO>>(),
         )
-            .into_response(),
+        .into_response(),
     )
 }
 
@@ -224,14 +226,14 @@ pub async fn start_game_handler(
                 success: false,
                 message: Some("No game found".to_string()),
             })
-                .into_response(),
+            .into_response(),
         );
     }
 
     let game = game_optional.unwrap().unwrap();
     // Create a random short id for the game here
     let id = id_generator(6);
-    let lobby = Lobby::new(id.clone(), game.text_section.clone());
+    let lobby = Lobby::new(game.text_section.clone());
 
     let mut state = state.write().unwrap();
     state.insert(id.clone(), RwLock::new(lobby));
@@ -300,7 +302,7 @@ pub async fn close_game_handler(
                 success: false,
                 message: Some("Game not found".to_string()),
             })
-                .into_response(),
+            .into_response(),
         );
     }
     (
@@ -309,7 +311,7 @@ pub async fn close_game_handler(
             success: true,
             message: None,
         })
-            .into_response(),
+        .into_response(),
     )
 }
 
@@ -344,7 +346,7 @@ pub async fn start_fill_handler(
                 success: false,
                 message: Some("Game not found".to_string()),
             })
-                .into_response(),
+            .into_response(),
         );
     }
     let mut lobby = lobby.unwrap().write().unwrap();
@@ -360,6 +362,6 @@ pub async fn start_fill_handler(
             success: true,
             message: None,
         })
-            .into_response(),
+        .into_response(),
     )
 }

@@ -4,7 +4,7 @@ use crate::dto::{
     UserDTO,
 };
 use crate::objects::{Lobby, User};
-use crate::ws_dto::{GuessScore, TempUser, WSMessage};
+use crate::ws_dto::{GuessScore, WSMessage};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;

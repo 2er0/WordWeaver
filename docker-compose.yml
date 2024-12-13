@@ -10,7 +10,7 @@ services:
     environment:
       - DATABASE_URL=surrealdb:8000
       - PRODUCTION=true
-      - AUTH_KEY=Blank69
+      - AUTH_KEY=Blank69 # Change this to a secure key
 
   surrealdb:
     image: surrealdb/surrealdb:latest

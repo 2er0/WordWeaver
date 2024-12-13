@@ -34,9 +34,3 @@ lazy_static! {
         })
     };
 }
-
-// #[derive(Debug, Serialize, Deserialize)]
-// pub struct GameDB<'a> {
-//     pub name: &'a String,
-//     pub gaps: Vec<String>,
-// }

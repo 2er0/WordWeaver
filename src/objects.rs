@@ -2,7 +2,7 @@ use std::sync::RwLock;
 use tokio::sync::broadcast;
 use utoipa::{
     openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
-    Modify, OpenApi,
+    Modify,
 };
 
 pub struct User {
@@ -28,14 +28,13 @@ pub struct GameState {
 }
 
 pub struct Lobby {
-    pub id: String,
     pub users: RwLock<Vec<User>>,
     pub game: GameState,
     pub finished: bool,
 }
 
 impl Lobby {
-    pub fn new(id: String, gaps: Vec<String>) -> Self {
+    pub fn new(gaps: Vec<String>) -> Self {
         // Create a new game state with the specified gaps
         // The last gap should not have a gap after it
         let gaps: Vec<RwLock<Gap>> = gaps
@@ -59,7 +58,6 @@ impl Lobby {
         };
         // Create a new lobby with the specified id and game state
         Lobby {
-            id,
             users: RwLock::new(vec![]),
             game: game_state,
             finished: false,
